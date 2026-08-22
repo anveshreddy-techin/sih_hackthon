@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply antialiased bg-slate-50 text-slate-900;
+    font-family: 'Inter', 'Noto Sans Telugu', 'Noto Sans Devanagari', system-ui, sans-serif;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.25s ease-out forwards;
+}
+
+/* Custom styling for Leaflet popups */
+.custom-leaflet-popup .leaflet-popup-content-wrapper {
+  border-radius: 1rem;
+  padding: 0.25rem;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
+
+.custom-leaflet-popup .leaflet-popup-tip {
+  background-color: white;
+}
