@@ -9,6 +9,8 @@ import {
   CentreStatus
 } from '../types';
 import { playQueueChime, playSuccessSound } from '../utils/sound';
+import { INITIAL_CENTRES, INITIAL_TOKENS, MSP_CATALOG, INITIAL_ANNOUNCEMENTS } from '../seedData';
+
 
 interface AppContextType {
   centres: ProcurementCentre[];
@@ -110,12 +112,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       const res = await fetch(`/api/centres?${params.toString()}`);
+      if (!res.ok) throw new Error('API not available, using client store');
       const json = await res.json();
       if (json.success) {
         setCentres(json.data);
       }
     } catch (e) {
-      console.error('Error fetching centres:', e);
+      // Fallback for static Netlify hosting
+      let list = [...(INITIAL_CENTRES as unknown as ProcurementCentre[])];
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        list = list.filter(c => c.name.toLowerCase().includes(q) || c.district.toLowerCase().includes(q));
+      }
+      if (selectedCrop && selectedCrop !== 'all') {
+        list = list.filter(c => c.acceptedCrops.some(ac => ac.cropId === selectedCrop));
+      }
+      if (selectedDistrict && selectedDistrict !== 'all') {
+        list = list.filter(c => c.district.toLowerCase() === selectedDistrict.toLowerCase());
+      }
+      if (selectedStatus && selectedStatus !== 'all') {
+        list = list.filter(c => c.status === selectedStatus);
+      }
+      setCentres(list);
     }
   }, [searchQuery, selectedCrop, selectedDistrict, selectedStatus, selectedRadius, userLocation]);
 
@@ -123,10 +141,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const fetchTokens = useCallback(async () => {
     try {
       const res = await fetch('/api/tokens');
+      if (!res.ok) throw new Error('API not available');
       const json = await res.json();
       if (json.success) {
         setAllTokens(json.data);
-        // Sync active token if present
         if (activeToken) {
           const updated = json.data.find((t: DigitalToken) => t.tokenNumber === activeToken.tokenNumber);
           if (updated) {
@@ -136,7 +154,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
     } catch (e) {
-      console.error('Error fetching tokens:', e);
+      const savedTokens = localStorage.getItem('kisansetu_tokens_list');
+      const tokensList = savedTokens ? JSON.parse(savedTokens) : (INITIAL_TOKENS as unknown as DigitalToken[]);
+      setAllTokens(tokensList);
     }
   }, [activeToken]);
 
@@ -144,12 +164,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const fetchAnnouncements = useCallback(async () => {
     try {
       const res = await fetch('/api/announcements');
+      if (!res.ok) throw new Error('API not available');
       const json = await res.json();
       if (json.success) {
         setAnnouncements(json.data);
       }
     } catch (e) {
-      console.error('Error fetching announcements:', e);
+      setAnnouncements(INITIAL_ANNOUNCEMENTS as unknown as Announcement[]);
     }
   }, []);
 
@@ -157,12 +178,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const fetchPrices = useCallback(async () => {
     try {
       const res = await fetch('/api/prices');
+      if (!res.ok) throw new Error('API not available');
       const json = await res.json();
       if (json.success) {
         setMspCatalog(json.data);
       }
     } catch (e) {
-      console.error('Error fetching MSP prices:', e);
+      setMspCatalog(MSP_CATALOG as unknown as MspCatalogItem[]);
     }
   }, []);
 
@@ -170,12 +192,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const fetchAnalytics = useCallback(async () => {
     try {
       const res = await fetch('/api/analytics');
+      if (!res.ok) throw new Error('API not available');
       const json = await res.json();
       if (json.success) {
         setAnalytics(json.data);
       }
     } catch (e) {
-      console.error('Error fetching analytics:', e);
+      setAnalytics({
+        totalCentres: 7,
+        openCentresCount: 5,
+        totalProcuredQuintals: 15400,
+        totalDailyQuota: 22000,
+        procurementPercentage: 70,
+        totalActiveTokens: 38,
+        cropStats: [
+          { name: "Paddy (Grade A / Sona Masoori)", name_te: "వరి (గ్రేడ్-ఎ)", totalProcured: 6800 },
+          { name: "Cotton (Long Staple)", name_te: "పత్తి", totalProcured: 3950 },
+          { name: "Red Chilli (Teja)", name_te: "ఎండు మిర్చి", totalProcured: 2800 },
+          { name: "Turmeric (Nizamabad)", name_te: "పసుపు", totalProcured: 1850 }
+        ]
+      });
     }
   }, []);
 
@@ -230,49 +266,100 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Book Token
   const bookToken = async (data: Partial<DigitalToken>): Promise<DigitalToken> => {
-    const res = await fetch('/api/tokens', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    const json = await res.json();
-    if (!json.success) {
-      throw new Error(json.message || 'Failed to book token');
+    try {
+      const res = await fetch('/api/tokens', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error('API offline');
+      const json = await res.json();
+      if (!json.success) throw new Error(json.message);
+      const token = json.data as DigitalToken;
+      setActiveToken(token);
+      playSuccessSound();
+      await refreshAll();
+      return token;
+    } catch (err) {
+      // Client-side fallback
+      const tokenSeq = Math.floor(40 + Math.random() * 50);
+      const newToken: DigitalToken = {
+        tokenNumber: `KST-0${tokenSeq}`,
+        centreId: data.centreId || 'PPC-TS-01',
+        centreName: data.centreName || 'Enumamula Agricultural Market Yard (PPC-01)',
+        farmerName: data.farmerName || 'Anvesh',
+        farmerName_te: data.farmerName_te || data.farmerName,
+        phone: data.phone || '9876543210',
+        aadhaarLast4: data.aadhaarLast4 || '3210',
+        passbookNo: data.passbookNo || 'TS-WGL-2026-8812',
+        cropId: data.cropId || 'paddy-grade-a',
+        cropName: data.cropName || 'Paddy (Grade A / Sona Masoori)',
+        quantityQuintals: data.quantityQuintals || 50,
+        vehicleType: data.vehicleType || 'Tractor-Trolley (ట్రాక్టర్)',
+        vehicleNumber: data.vehicleNumber || 'TS 03 AA 5555',
+        slotDate: data.slotDate || new Date().toISOString().split('T')[0],
+        slotTime: data.slotTime || '11:00 AM - 12:00 PM',
+        status: 'BOOKED',
+        issuedAt: new Date().toISOString()
+      };
+      const existing = JSON.parse(localStorage.getItem('kisansetu_tokens_list') || '[]');
+      existing.unshift(newToken);
+      localStorage.setItem('kisansetu_tokens_list', JSON.stringify(existing));
+      setActiveToken(newToken);
+      playSuccessSound();
+      setAllTokens(existing);
+      return newToken;
     }
-    const token = json.data as DigitalToken;
-    setActiveToken(token);
-    playSuccessSound();
-    await refreshAll();
-    return token;
   };
 
   // Update Token Status
   const updateTokenStatus = async (tokenNumber: string, updateData: Partial<DigitalToken>): Promise<DigitalToken> => {
-    const res = await fetch(`/api/tokens/${tokenNumber}/status`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updateData)
-    });
-    const json = await res.json();
-    if (!json.success) {
-      throw new Error(json.message || 'Failed to update token status');
+    try {
+      const res = await fetch(`/api/tokens/${tokenNumber}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateData)
+      });
+      if (!res.ok) throw new Error('API offline');
+      const json = await res.json();
+      if (!json.success) throw new Error(json.message);
+      await refreshAll();
+      return json.data;
+    } catch (err) {
+      if (activeToken && activeToken.tokenNumber === tokenNumber) {
+        const updated = { ...activeToken, ...updateData };
+        setActiveToken(updated);
+      }
+      setAllTokens(prev => prev.map(t => t.tokenNumber === tokenNumber ? { ...t, ...updateData } : t));
+      return { ...(activeToken || {}), ...updateData } as DigitalToken;
     }
-    await refreshAll();
-    return json.data;
   };
 
   // Admin: Call Next Token
   const callNextToken = async (centreId: string): Promise<DigitalToken | null> => {
-    const res = await fetch(`/api/queue/${centreId}/call-next`, {
-      method: 'POST'
-    });
-    const json = await res.json();
-    if (!json.success) {
-      throw new Error(json.message || 'Failed to call next token');
+    try {
+      const res = await fetch(`/api/queue/${centreId}/call-next`, {
+        method: 'POST'
+      });
+      if (!res.ok) throw new Error('API offline');
+      const json = await res.json();
+      if (!json.success) throw new Error(json.message);
+      playQueueChime();
+      await refreshAll();
+      return json.data.token;
+    } catch (err) {
+      playQueueChime();
+      const waiting = allTokens.find(t => t.centreId === centreId && ['BOOKED', 'CHECKED_IN'].includes(t.status));
+      if (waiting) {
+        updateTokenStatus(waiting.tokenNumber, { status: 'TESTING' });
+        setCentres(prev => prev.map(c => c.id === centreId ? {
+          ...c,
+          queue: { ...c.queue, currentlyServingToken: waiting.tokenNumber }
+        } : c));
+        return waiting;
+      }
+      return null;
     }
-    playQueueChime();
-    await refreshAll();
-    return json.data.token;
   };
 
   // Admin: Update Centre Status
@@ -282,17 +369,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     statusReason?: string,
     statusReason_te?: string
   ): Promise<ProcurementCentre> => {
-    const res = await fetch(`/api/centres/${id}/status`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status, statusReason, statusReason_te })
-    });
-    const json = await res.json();
-    if (!json.success) {
-      throw new Error(json.message || 'Failed to update centre');
+    try {
+      const res = await fetch(`/api/centres/${id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, statusReason, statusReason_te })
+      });
+      if (!res.ok) throw new Error('API offline');
+      const json = await res.json();
+      if (!json.success) throw new Error(json.message);
+      await refreshAll();
+      return json.data;
+    } catch (err) {
+      setCentres(prev => prev.map(c => c.id === id ? {
+        ...c,
+        status,
+        statusReason: statusReason || c.statusReason,
+        statusReason_te: statusReason_te || c.statusReason_te
+      } : c));
+      return centres.find(c => c.id === id)!;
     }
-    await refreshAll();
-    return json.data;
   };
 
   // Admin: Update Crop Configuration
