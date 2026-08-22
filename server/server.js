@@ -254,9 +254,14 @@ app.get('*', (req, res, next) => {
   });
 });
 
-// Start Express Server
-app.listen(PORT, () => {
-  console.log(`🌾 KisanSetu API Server running on port ${PORT}`);
-  console.log(`📍 Endpoint: http://localhost:${PORT}/api/centres`);
-});
+// Start Express Server only when run directly (not serverless)
+if (process.env.VERCEL !== '1') {
+  app.listen(PORT, () => {
+    console.log(`🌾 KisanSetu API Server running on port ${PORT}`);
+    console.log(`📍 Endpoint: http://localhost:${PORT}/api/centres`);
+  });
+}
+
+export default app;
+
 
