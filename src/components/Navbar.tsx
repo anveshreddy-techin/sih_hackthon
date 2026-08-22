@@ -93,8 +93,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenVoice }) => {
                 <span className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
                   {lang === 'te' ? 'కిసాన్ సేతు' : lang === 'hi' ? 'किसान सेतु' : 'KisanSetu'}
                 </span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-agri-100 text-agri-800 uppercase tracking-wider border border-agri-300">
-                  Govt Agri
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 uppercase tracking-wider border border-amber-300 shadow-xs">
+                  Anvesh SIH
                 </span>
               </div>
               <p className="text-xs text-slate-500 font-medium hidden sm:block">

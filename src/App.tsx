@@ -286,13 +286,13 @@ export const App: React.FC = () => {
       <footer className="bg-slate-900 text-white border-t border-slate-800 text-xs py-8 px-4 sm:px-6 lg:px-8 mt-auto">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-lg bg-agri-600 flex items-center justify-center text-white">
+            <div className="w-8 h-8 rounded-lg bg-agri-600 flex items-center justify-center text-white font-bold">
               <Sprout className="w-5 h-5" />
             </div>
             <div>
-              <div className="font-extrabold text-sm text-white">KisanSetu • కిసాన్ సేతు</div>
+              <div className="font-extrabold text-sm text-white">KisanSetu • కిసాన్ సేతు (Anvesh SIH Project)</div>
               <div className="text-slate-400 text-[11px]">
-                Smart Farmer Procurement Schedule & Status Information System
+                Smart Farmer Procurement Schedule & Status Information System | Developed by Anvesh
               </div>
             </div>
           </div>
